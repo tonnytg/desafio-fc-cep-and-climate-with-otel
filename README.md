@@ -1,5 +1,17 @@
 # Go Weather by CEP - Otel
 
+### Tecnologies used
+
+- Go
+- Docker
+- docker-compose
+- Open Telemetry
+- Zipkin
+
+# Evidences
+
+![zipkin-tracing.png](zipkin-tracing.png)
+
 ### Log Active
 
 Service A talking with Service B using HTTP

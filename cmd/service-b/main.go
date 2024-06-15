@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/domain"
+	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/infra/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"log"
 	"net/http"
 	"os"
@@ -14,7 +16,6 @@ type ErrorMessage struct {
 }
 
 func ReplyRequest(w http.ResponseWriter, statusCode int, msg string) error {
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
@@ -31,6 +32,9 @@ func ReplyRequest(w http.ResponseWriter, statusCode int, msg string) error {
 }
 
 func handlerIndex(w http.ResponseWriter, r *http.Request) {
+	tr := otel.GetTracer()
+	_, span := tr.Start(r.Context(), "handlerIndex")
+	defer span.End()
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -41,12 +45,14 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		_ = ReplyRequest(w, http.StatusBadRequest, "no zipcode provided")
+		span.SetAttributes(attribute.String("error", "no zipcode provided"))
 		return
 	}
 
 	location, err := domain.NewLocation(data.CEP)
 	if err != nil {
 		log.Println(err)
+		span.SetAttributes(attribute.String("error", fmt.Sprintf("invalid zipcode: %v", err)))
 		_ = ReplyRequest(w, http.StatusUnprocessableEntity, "invalid zipcode")
 		return
 	}
@@ -56,17 +62,19 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 
 	err = serv.Execute(location)
 	if err != nil {
-
 		errorCode := err.Error()
 
 		if errorCode == "422" {
 			log.Println("invalid zipcode", location)
+			span.SetAttributes(attribute.String("error", "invalid zipcode"))
 			_ = ReplyRequest(w, http.StatusUnprocessableEntity, "invalid zipcode")
 		} else if errorCode == "404" {
 			log.Println("can not find zipcode")
+			span.SetAttributes(attribute.String("error", "can not find zipcode"))
 			_ = ReplyRequest(w, http.StatusNotFound, "can not find zipcode")
 		} else {
 			log.Println("internal server error")
+			span.SetAttributes(attribute.String("error", "internal server error"))
 			_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
@@ -74,20 +82,17 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 
 	byteResponseData, err := json.Marshal(location)
 	if err != nil {
+		span.SetAttributes(attribute.String("error", fmt.Sprintf("error marshaling response: %v", err)))
 		_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(byteResponseData)
-
-	return
 }
 
 func StartCepCollector() {
-
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/", handlerIndex)
 
 	port := os.Getenv("PORT")
@@ -104,6 +109,21 @@ func StartCepCollector() {
 func main() {
 	log.Println("Start Service B")
 
-	StartCepCollector()
+	cleanup := otel.InitTracer(
+		"service-b",
+		attribute.String("deployment.environment", "production"),
+		attribute.String("service.name", "service-b"),
+		attribute.String("service.version", "1.0.0"),
+		attribute.String("service.instance.id", "instance-456"),
+		attribute.String("host.name", "host-def"),
+		attribute.String("host.id", "host-id-789"),
+		attribute.String("telemetry.sdk.name", "opentelemetry"),
+		attribute.String("telemetry.sdk.language", "go"),
+		attribute.String("telemetry.sdk.version", "1.0.0"),
+		attribute.String("component", "cep-checker"),
+		attribute.String("responsibility", "check cep"),
+	)
+	defer cleanup()
 
+	StartCepCollector()
 }
