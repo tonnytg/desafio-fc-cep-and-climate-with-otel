@@ -10,6 +10,7 @@ import (
 
 func TestWeatherGet(t *testing.T) {
 
+	// Lê o conteúdo do arquivo .env
 	b, err := os.ReadFile("../../../.env")
 	if err != nil {
 		t.Errorf("file .env not found")
@@ -17,6 +18,11 @@ func TestWeatherGet(t *testing.T) {
 
 	env := string(b)
 	log.Println("env:", env)
+
+	// Remove o caractere % do final da linha, se existir
+	env = strings.TrimRight(env, "%\n")
+
+	// Divide a string em chave e valor
 	list := strings.Split(env, "=")
 	if list[0] == "WEATHER_API_KEY" {
 
@@ -27,6 +33,12 @@ func TestWeatherGet(t *testing.T) {
 		}
 	}
 
+	checkApiToken := os.Getenv("WEATHER_API_KEY")
+	log.Println("checkApiToken:", checkApiToken)
+	if checkApiToken == "" {
+		t.Error("error to load weather api key, check end of line in .env with cat if has %")
+	}
+
 	wc, err := weather.GetWeather("São Paulo")
 	if err != nil {
 		t.Error("error to get weather")
@@ -35,5 +47,4 @@ func TestWeatherGet(t *testing.T) {
 	if wc < 1 {
 		t.Error("sorry but something wrong with São Paulo")
 	}
-
 }

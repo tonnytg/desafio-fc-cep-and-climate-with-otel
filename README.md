@@ -22,6 +22,7 @@ Service A talking with Service B using HTTP
 ## How to use
 
 create `.env` and set you `WEATHER_API_KEY`
+if you have problem in go test ./... in weather, check .env with cat; in end of file has % and remove it.
 
 Get API KEY in https://www.weatherapi.com/my/
 
