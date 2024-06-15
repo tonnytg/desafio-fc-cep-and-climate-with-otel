@@ -1,6 +1,6 @@
 # Go Weather by CEP - Otel
 
-### Tecnologies used
+## Tecnologias Utilizadas
 
 - Go
 - Docker
@@ -8,117 +8,118 @@
 - Open Telemetry
 - Zipkin
 
-# Evidences
+## Evidências
+
+### Tracing com Zipkin
 
 ![zipkin-tracing.png](zipkin-tracing.png)
 
-### Log Active
+### Logs de Transações
 
-Service A talking with Service B using HTTP
+Service A comunicando-se com Service B via HTTP
 
 ![logs-transactions.png](logs-transactions.png)
 
+## Como Usar
 
+1. Crie um arquivo `.env` e configure sua `WEATHER_API_KEY`.
+2. Se encontrar problemas ao executar `go test ./...` no serviço de clima, verifique o `.env` com o comando `cat`.
+    - Se houver um `%` no final do arquivo, remova-o.
 
-## How to use
+Obtenha a API KEY em [WeatherAPI](https://www.weatherapi.com/my/).
 
-create `.env` and set you `WEATHER_API_KEY`
-if you have problem in `go test ./...` in weather, check `.env` with `cat`
-if you found `%` in end of file, remove it.
+## Endpoints de APIs Externas Utilizadas
 
-Get API KEY in https://www.weatherapi.com/my/
-
-## External API Endpoins used
-
-To get Cep and details
+### Para Obter CEP e Detalhes
 - [ViaCEP](https://viacep.com.br/)
 
-To get Weather and details
+### Para Obter Clima e Detalhes
 - [WeatherAPI](https://www.weatherapi.com/)
 
-## Temperature conversion
+## Conversão de Temperatura
 
-To convert Celsius to Fahrenheit
-- F = C * 1,8 + 32
+### Celsius para Fahrenheit
+- Fórmula: `F = C * 1,8 + 32`
 
-To convert Celsius to Kelvin
-- K = C + 273
+### Celsius para Kelvin
+- Fórmula: `K = C + 273`
 
-## Requirements
+## Requisitos
 
 - Go 1.16
 - Docker
 
+## Detalhes sobre o Desafio
 
-## Details about changellenge
+### Objetivo
 
-### Objetivo:
+Desenvolver um sistema em Go que receba um CEP, identifique a cidade e retorne o clima atual (temperatura em graus Celsius, Fahrenheit e Kelvin) juntamente com o nome da cidade. Esse sistema deve implementar OTEL (Open Telemetry) e Zipkin.
 
-Desenvolver um sistema em Go que receba um CEP, identifica a cidade e retorna o clima atual (temperatura em graus celsius, fahrenheit e kelvin) juntamente com a cidade. Esse sistema deverá implementar OTEL(Open Telemetry) e Zipkin.
+### Serviço A
 
-Baseado no cenário conhecido "Sistema de temperatura por CEP" denominado Serviço B, será incluso um novo projeto, denominado Serviço A.
+#### Requisitos - Serviço A (Responsável pelo Input)
 
-### Service A
+1. O sistema deve receber um input de 8 dígitos via POST, utilizando o esquema: `{ "cep": "29902555" }`.
+2. O sistema deve validar se o input é válido (contém 8 dígitos e é uma STRING).
+3. Caso seja válido, o CEP deve ser encaminhado para o Serviço B via HTTP.
+4. Caso não seja válido, deve retornar:
+    - Código HTTP: 422
+    - Mensagem: "invalid zipcode"
 
-#### Requisitos - Serviço A (responsável pelo input):
+### Serviço B
 
-O sistema deve receber um input de 8 dígitos via POST, através do schema:  { "cep": "29902555" }
-O sistema deve validar se o input é valido (contem 8 dígitos) e é uma STRING
-Caso seja válido, será encaminhado para o Serviço B via HTTP
+#### Requisitos - Serviço B (Responsável pela Orquestração)
 
-#### Caso não seja válido, deve retornar:
-Código HTTP: 422
-Mensagem: invalid zipcode
+1. O sistema deve receber um CEP válido de 8 dígitos.
+2. O sistema deve realizar a pesquisa do CEP e encontrar o nome da localização. A partir disso, deve retornar as temperaturas formatadas em Celsius, Fahrenheit, Kelvin juntamente com o nome da localização.
+3. O sistema deve responder adequadamente nos seguintes cenários:
 
+##### Em caso de sucesso:
 
-### Service B
+- Código HTTP: 200
+- Corpo da Resposta: `{ "city": "São Paulo", "temp_C": 28.5, "temp_F": 83.3, "temp_K": 301.5 }`
 
-#### Requisitos - Serviço B (responsável pela orquestração):
+##### Em caso de falha, se o CEP não for válido (com formato correto):
 
-O sistema deve receber um CEP válido de 8 digitos
-O sistema deve realizar a pesquisa do CEP e encontrar o nome da localização, a partir disso, deverá retornar as temperaturas e formata-lás em: Celsius, Fahrenheit, Kelvin juntamente com o nome da localização.
-O sistema deve responder adequadamente nos seguintes cenários:
+- Código HTTP: 422
+- Mensagem: "invalid zipcode"
 
-Em caso de sucesso:
+##### Em caso de falha, se o CEP não for encontrado:
 
-Código HTTP: 200
-Response Body: { "city: "São Paulo", "temp_C": 28.5, "temp_F": 28.5, "temp_K": 28.5 }
+- Código HTTP: 404
+- Mensagem: "cannot find zipcode"
 
-Em caso de falha, caso o CEP não seja válido (com formato correto):
+### OTEL + Zipkin
 
-Código HTTP: 422
-Mensagem: invalid zipcode
+#### Implementação:
 
-Em caso de falha, caso o CEP não seja encontrado:
+1. Implementar tracing distribuído entre Serviço A e Serviço B.
+2. Utilizar spans para medir o tempo de resposta do serviço de busca de CEP e busca de temperatura.
 
-Código HTTP: 404
-Mensagem: can not find zipcode
+### Dicas:
 
-#### OTEL + Zipkin:
+1. Utilize a API ViaCEP (ou similar) para encontrar a localização: [ViaCEP](https://viacep.com.br/).
+2. Utilize a API WeatherAPI (ou similar) para consultar as temperaturas: [WeatherAPI](https://www.weatherapi.com/).
 
-Após a implementação dos serviços, adicione a implementação do OTEL + Zipkin:
+#### Fórmulas para Conversão:
 
-Implementar tracing distribuído entre Serviço A - Serviço B
-Utilizar span para medir o tempo de resposta do serviço de busca de CEP e busca de temperatura
-Dicas:
+- Celsius para Fahrenheit: `F = C * 1,8 + 32`
+- Celsius para Kelvin: `K = C + 273`
 
-Utilize a API viaCEP (ou similar) para encontrar a localização que deseja consultar a temperatura: https://viacep.com.br/
-Utilize a API WeatherAPI (ou similar) para consultar as temperaturas desejadas: https://www.weatherapi.com/
+Sendo:
+- F = Fahrenheit
+- C = Celsius
+- K = Kelvin
 
-Para realizar a conversão de Celsius para Fahrenheit, utilize a seguinte fórmula: F = C * 1,8 + 32
-Para realizar a conversão de Celsius para Kelvin, utilize a seguinte fórmula: K = C + 273
+#### Links Úteis:
 
-Sendo F = Fahrenheit
-Sendo C = Celsius
-Sendo K = Kelvin
+- [Implementação do OTEL](https://opentelemetry.io/docs/)
+- [Implementação de Spans](https://opentelemetry.io/docs/instrumentation/)
+- [Serviço de Collector do OTEL](https://opentelemetry.io/docs/collector/)
+- [Informações sobre Zipkin](https://zipkin.io/)
 
-Para dúvidas da implementação do OTEL, você pode clicar aqui
-Para implementação de spans, você pode clicar aqui
-Você precisará utilizar um serviço de collector do OTEL
-Para mais informações sobre Zipkin, você pode clicar aqui
+### Entrega
 
-#### Entrega:
-
-O código-fonte completo da implementação.
-Documentação explicando como rodar o projeto em ambiente dev.
-Utilize docker/docker-compose para que possamos realizar os testes de sua aplicação.
+1. Código-fonte completo da implementação.
+2. Documentação explicando como rodar o projeto em ambiente de desenvolvimento.
+3. Utilize Docker/docker-compose para que possamos realizar os testes da aplicação.
