@@ -1,0 +1,30 @@
+GET http://localhost:8080
+Accept: application/json
+
+###
+POST http://localhost:8080
+Content-Type: application/json
+Accept: application/json
+
+{
+  "cep": "12345678"
+}
+
+###
+POST http://localhost:8080
+Content-Type: application/json
+Accept: application/json
+
+{
+  "cep": "a"
+}
+
+
+###
+POST http://localhost:8080
+Content-Type: application/json
+Accept: application/json
+
+{
+  "cep": "29902555"
+}

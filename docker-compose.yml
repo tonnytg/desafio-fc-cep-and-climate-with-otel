@@ -1,0 +1,18 @@
+services:
+  service-a:
+    build:
+      context: .
+      args:
+        CMD_DIR: ./cmd/service-a/main.go
+    container_name: backend-service-a
+    ports:
+      - 8080:8080
+
+  service-b:
+    build:
+      context: .
+      args:
+        CMD_DIR: ./cmd/service-b/main.go
+    container_name: backend-service-b
+    environment:
+      - WEATHER_API_KEY
