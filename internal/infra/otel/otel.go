@@ -19,3 +19,5 @@ func Logger(ctx context.Context, message string) {
 	span.SetAttributes(attribute.String("log", message))
 	log.Printf("Log: %s", message)
 }
+
+func GetTextMapPropagator() {}

@@ -9,7 +9,7 @@ ARG CMD_DIR=.
 COPY . .
 
 # Compila o binário
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o location ${CMD_DIR}
+RUN CGO_ENABLED=0 GOOS=linux go build -o location ${CMD_DIR}
 
 # Etapa final
 FROM golang:1.22.2-alpine

@@ -1,6 +1,7 @@
 package webserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/domain"
@@ -54,7 +55,9 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 	repo := domain.NewLocationRepository()
 	serv := domain.NewLocationService(repo)
 
-	err = serv.Execute(l)
+	var ctx context.Context
+
+	err = serv.Execute(ctx, l)
 	if err != nil {
 
 		errorCode := err.Error()

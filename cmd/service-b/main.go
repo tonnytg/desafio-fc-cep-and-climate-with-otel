@@ -32,9 +32,10 @@ func ReplyRequest(w http.ResponseWriter, statusCode int, msg string) error {
 }
 
 func handlerIndex(w http.ResponseWriter, r *http.Request) {
+
 	tr := otel.GetTracer()
-	_, span := tr.Start(r.Context(), "handlerIndex")
-	defer span.End()
+	ctxSpanFull, spanFull := tr.Start(r.Context(), "handlerIndex - Start process")
+	defer spanFull.End()
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -44,15 +45,20 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
+
 		_ = ReplyRequest(w, http.StatusBadRequest, "no zipcode provided")
-		span.SetAttributes(attribute.String("error", "no zipcode provided"))
+
+		spanFull.SetAttributes(attribute.String("error", "no zipcode provided"))
 		return
 	}
 
 	location, err := domain.NewLocation(data.CEP)
 	if err != nil {
+
 		log.Println(err)
-		span.SetAttributes(attribute.String("error", fmt.Sprintf("invalid zipcode: %v", err)))
+
+		spanFull.SetAttributes(attribute.String("error", fmt.Sprintf("invalid zipcode: %v", err)))
+
 		_ = ReplyRequest(w, http.StatusUnprocessableEntity, "invalid zipcode")
 		return
 	}
@@ -60,29 +66,42 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 	repo := domain.NewLocationRepository()
 	serv := domain.NewLocationService(repo)
 
-	err = serv.Execute(location)
+	ctxSpanExecute, spanExecute := tr.Start(ctxSpanFull, "Preparing Execute - getting city and weather")
+	defer spanExecute.End()
+
+	err = serv.Execute(ctxSpanExecute, location)
 	if err != nil {
 		errorCode := err.Error()
 
 		if errorCode == "422" {
+
 			log.Println("invalid zipcode", location)
-			span.SetAttributes(attribute.String("error", "invalid zipcode"))
+
+			spanExecute.SetAttributes(attribute.String("error", "invalid zipcode"))
+
 			_ = ReplyRequest(w, http.StatusUnprocessableEntity, "invalid zipcode")
 		} else if errorCode == "404" {
+
 			log.Println("can not find zipcode")
-			span.SetAttributes(attribute.String("error", "can not find zipcode"))
+
+			spanExecute.SetAttributes(attribute.String("error", "can not find zipcode"))
+
 			_ = ReplyRequest(w, http.StatusNotFound, "can not find zipcode")
+
 		} else {
+
 			log.Println("internal server error")
-			span.SetAttributes(attribute.String("error", "internal server error"))
+
+			spanExecute.SetAttributes(attribute.String("error", "internal server error"))
+
 			_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
+
 		}
 		return
 	}
 
 	byteResponseData, err := json.Marshal(location)
 	if err != nil {
-		span.SetAttributes(attribute.String("error", fmt.Sprintf("error marshaling response: %v", err)))
 		_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
 		return
 	}

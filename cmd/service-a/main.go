@@ -35,9 +35,10 @@ func ReplyRequest(w http.ResponseWriter, statusCode int, msg string) error {
 }
 
 func handlerIndex(w http.ResponseWriter, r *http.Request) {
+
 	tr := otel.GetTracer()
-	ctx, span := tr.Start(r.Context(), "handlerIndex")
-	defer span.End()
+	ctxFull, spanFull := tr.Start(r.Context(), "getting information about cep")
+	defer spanFull.End()
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -48,25 +49,33 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		_ = ReplyRequest(w, http.StatusBadRequest, "no zipcode provided")
-		span.SetAttributes(attribute.String("error", "no zipcode provided"))
-		otel.Logger(ctx, "no zipcode provided")
+
+		spanFull.SetAttributes(attribute.String("error", "no zipcode provided"))
+		otel.Logger(ctxFull, "no zipcode provided")
+
 		return
 	}
 
 	l, err := domain.NewLocation(data.CEP)
 	if err != nil {
+
 		log.Println(err)
-		span.SetAttributes(attribute.String("error", fmt.Sprintf("invalid zipcode: %v", err)))
-		otel.Logger(ctx, fmt.Sprintf("invalid zipcode: %v", err))
+
+		spanFull.SetAttributes(attribute.String("error", fmt.Sprintf("invalid zipcode: %v", err)))
+		otel.Logger(ctxFull, fmt.Sprintf("invalid zipcode: %v", err))
+
 		_ = ReplyRequest(w, http.StatusUnprocessableEntity, "invalid zipcode")
 		return
 	}
 
 	err = l.Validate()
 	if err != nil {
+
 		log.Println("invalid zipcode", l)
-		span.SetAttributes(attribute.String("error", fmt.Sprintf("invalid zipcode: %v", l)))
-		otel.Logger(ctx, fmt.Sprintf("invalid zipcode: %v", l))
+
+		spanFull.SetAttributes(attribute.String("error", fmt.Sprintf("invalid zipcode: %v", l)))
+		otel.Logger(ctxFull, fmt.Sprintf("invalid zipcode: %v", l))
+
 		_ = ReplyRequest(w, http.StatusUnprocessableEntity, "invalid zipcode")
 		return
 	}
@@ -75,34 +84,42 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
+
 		log.Println("error marshaling data:", err)
-		span.SetAttributes(attribute.String("error", fmt.Sprintf("error marshaling data: %v", err)))
-		otel.Logger(ctx, fmt.Sprintf("error marshaling data: %v", err))
+
+		spanFull.SetAttributes(attribute.String("error", fmt.Sprintf("error marshaling data: %v", err)))
+		otel.Logger(ctxFull, fmt.Sprintf("error marshaling data: %v", err))
+
 		_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	serviceBSpanCtx, serviceBSpan := tr.Start(ctx, "call-service-b")
-	defer serviceBSpan.End()
-
 	log.Println("start request to service b passing cep:", l.GetCEP())
-	serviceBSpan.SetAttributes(attribute.String("start request", l.GetCEP()))
-	otel.Logger(ctx, fmt.Sprintf("start request to service b passing cep: %s", l.GetCEP()))
+
+	ctxRequestServiceB, spanRequestServiceB := tr.Start(ctxFull, "getting information to service b")
+	defer spanRequestServiceB.End()
+	spanRequestServiceB.SetAttributes(attribute.String("start request", l.GetCEP()))
 
 	resp, err := http.Post(serviceB, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
+
 		log.Println("error sending data to service-b:", err)
-		serviceBSpan.SetAttributes(attribute.String("error", fmt.Sprintf("error sending data to service-b: %v", err)))
-		otel.Logger(serviceBSpanCtx, fmt.Sprintf("error sending data to service-b: %v", err))
+
+		spanRequestServiceB.SetAttributes(attribute.String("error", fmt.Sprintf("error sending data to service-b: %v", err)))
+		otel.Logger(ctxRequestServiceB, fmt.Sprintf("error sending data to service-b: %v", err))
+
 		_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+
 		log.Println("service-b returned non-OK status:", resp.Status)
-		serviceBSpan.SetAttributes(attribute.String("error", fmt.Sprintf("service-b returned non-OK status: %v", resp.Status)))
-		otel.Logger(serviceBSpanCtx, fmt.Sprintf("service-b returned non-OK status: %v", resp.Status))
+
+		spanRequestServiceB.SetAttributes(attribute.String("error", fmt.Sprintf("service-b returned non-OK status: %v", resp.Status)))
+		otel.Logger(ctxRequestServiceB, fmt.Sprintf("service-b returned non-OK status: %v", resp.Status))
+
 		if resp.StatusCode == 404 {
 			_ = ReplyRequest(w, resp.StatusCode, "can not find zipcode")
 		} else if resp.StatusCode == 422 {
@@ -115,16 +132,15 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+
 		log.Println("error to io.ReadAll resp.Body")
-		serviceBSpan.SetAttributes(attribute.String("error", fmt.Sprintf("error to io.ReadAll resp.Body: %v", err)))
-		otel.Logger(serviceBSpanCtx, fmt.Sprintf("error to io.ReadAll resp.Body: %v", err))
+
+		spanRequestServiceB.SetAttributes(attribute.String("error", fmt.Sprintf("error to io.ReadAll resp.Body: %v", err)))
+		otel.Logger(ctxRequestServiceB, fmt.Sprintf("error to io.ReadAll resp.Body: %v", err))
+
 		_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
-
-	log.Println("body:", string(body))
-	serviceBSpan.SetAttributes(attribute.String("body", string(body)))
-	otel.Logger(serviceBSpanCtx, fmt.Sprintf("body: %s", string(body)))
 
 	var responseData struct {
 		City  string  `json:"city"`
@@ -136,8 +152,8 @@ func handlerIndex(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(body, &responseData)
 	if err != nil {
 		log.Println("error to unMarshall resp.Body")
-		serviceBSpan.SetAttributes(attribute.String("error", fmt.Sprintf("error to unMarshall resp.Body: %v", err)))
-		otel.Logger(serviceBSpanCtx, fmt.Sprintf("error to unMarshall resp.Body: %v", err))
+		spanRequestServiceB.SetAttributes(attribute.String("error", fmt.Sprintf("error to unMarshall resp.Body: %v", err)))
+		otel.Logger(ctxRequestServiceB, fmt.Sprintf("error to unMarshall resp.Body: %v", err))
 		_ = ReplyRequest(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
@@ -162,7 +178,6 @@ func StartCepCollector() {
 	}
 
 	log.Println("Start CEP Collector listen in port:", port)
-	otel.Logger(context.Background(), fmt.Sprintf("Start CEP Collector listen in port: %s", port))
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		otel.Logger(context.Background(), fmt.Sprintf("error to start http server: %v", err))
 		log.Panicf("error to start http server")
@@ -188,6 +203,5 @@ func main() {
 	)
 	defer cleanup()
 
-	otel.Logger(context.Background(), "Start Service A")
 	StartCepCollector()
 }
