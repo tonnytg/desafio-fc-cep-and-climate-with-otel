@@ -14,8 +14,11 @@
 
 Cadeia de eventos amarrados por contexto do Header
 
-![zipkin-evidences.png](zipkin-evidences.png)
+Adicionado o spanCity.End para o inicio do novo spanWeather. <br/>
+Obrigado @Gabriel Araujo Carneiro Junior, pelo toque, ajudou a entender a estrutura.
 
+
+![spanCityEnd-evidences.png](spanCityEnd-evidences.png)
 
 ### Logs de Transações
 

@@ -29,7 +29,5 @@ func TestExecute(t *testing.T) {
 
 	l, _ := domain.NewLocation("05541000")
 
-	var ctx context.Context
-
-	s.Execute(ctx, l)
+	s.Execute(context.Background(), l)
 }

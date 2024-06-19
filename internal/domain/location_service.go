@@ -35,19 +35,20 @@ func (s *LocationService) Execute(ctx context.Context, l *Location) error {
 	//log.Println("service received:", data)
 
 	ctxCity, spanCity := tracer.Start(ctx, "service_b-handler-execute-city")
-	defer spanCity.End()
 
 	spanCity.SetAttributes(attribute.String("service.action", "get city"))
 	city, err := cep.GetCity(l.GetCEP())
 	if err != nil {
 		log.Println("error to get cep:", l.GetCEP())
 		spanCity.SetAttributes(attribute.String("service.status", "failed"))
+		spanCity.End()
 		return fmt.Errorf("404")
 	}
 
 	if city == "" {
 		log.Println("error to get cep:", l.GetCEP())
 		spanCity.SetAttributes(attribute.String("service.status", "failed"))
+		spanCity.End()
 		return fmt.Errorf("404")
 	}
 
@@ -56,6 +57,7 @@ func (s *LocationService) Execute(ctx context.Context, l *Location) error {
 		return fmt.Errorf("500")
 	}
 	spanCity.SetAttributes(attribute.String("service.status", "success"))
+	spanCity.End()
 
 	_, spanWeather := tracer.Start(ctxCity, "service_b-handler-execute-weather")
 	defer spanWeather.End()
