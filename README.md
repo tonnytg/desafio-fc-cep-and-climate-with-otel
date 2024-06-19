@@ -12,7 +12,10 @@
 
 ### Tracing com Zipkin
 
-![zipkin-tracing.png](zipkin-tracing.png)
+Cadeia de eventos amarrados por contexto do Header
+
+![zipkin-evidences.png](zipkin-evidences.png)
+
 
 ### Logs de Transações
 

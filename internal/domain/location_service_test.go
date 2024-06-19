@@ -4,16 +4,12 @@ import (
 	"context"
 	_ "embed"
 	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/domain"
-	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/infra/otel"
 	"os"
 	"strings"
 	"testing"
 )
 
 func TestExecute(t *testing.T) {
-
-	cleanup := otel.InitTracerTest()
-	defer cleanup()
 
 	//os.Setenv("WEATHER_API_KEY", "011d847082bc437cbcc192904241206")
 

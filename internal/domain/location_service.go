@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/infra/cep"
-	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/infra/otel"
 	"github.com/tonnytg/desafio-fc-cep-and-climate-with-otel/internal/infra/weather"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"log"
 )
@@ -24,58 +24,58 @@ func NewLocationService(repo LocationRepositoryInterface) *LocationService {
 
 func (s *LocationService) Execute(ctx context.Context, l *Location) error {
 
-	tr := otel.GetTracer()
-	ctxSpanFull, spanFull := tr.Start(ctx, "Execute CEP and Weather: getting information")
-	defer spanFull.End()
+	tracer := otel.Tracer("service-b")
+
+	ctx, span := tracer.Start(ctx, "service_b-handler-execute")
+	defer span.End()
+
+	span.SetAttributes(attribute.String("service.name", "service-b"))
 
 	//data := s.repo.Get(l.CEP)
 	//log.Println("service received:", data)
 
-	ctxSpanCep, spanCep := tr.Start(ctxSpanFull, "Execute CEP: getting information about cep")
-	defer spanCep.End()
+	ctxCity, spanCity := tracer.Start(ctx, "service_b-handler-execute-city")
+	defer spanCity.End()
 
+	spanCity.SetAttributes(attribute.String("service.action", "get city"))
 	city, err := cep.GetCity(l.GetCEP())
 	if err != nil {
 		log.Println("error to get cep:", l.GetCEP())
-		otel.Logger(ctxSpanCep, "status: error to get cep")
-		spanCep.SetAttributes(attribute.String("action", "get cep"), attribute.String("status", "failed"))
+		spanCity.SetAttributes(attribute.String("service.status", "failed"))
 		return fmt.Errorf("404")
 	}
 
 	if city == "" {
 		log.Println("error to get cep:", l.GetCEP())
-		otel.Logger(ctxSpanCep, "status: error to get city")
-		spanCep.SetAttributes(attribute.String("action", "get city"), attribute.String("status", "failed"))
+		spanCity.SetAttributes(attribute.String("service.status", "failed"))
 		return fmt.Errorf("404")
 	}
-	spanCep.SetAttributes(attribute.String("action", "get city"), attribute.String("status", "success"))
 
 	err = l.SetCity(city)
 	if err != nil {
 		return fmt.Errorf("500")
 	}
+	spanCity.SetAttributes(attribute.String("service.status", "success"))
 
-	ctxSpanWeather, spanWeather := tr.Start(ctxSpanFull, "Execute WEATHER: getting information about city")
+	_, spanWeather := tracer.Start(ctxCity, "service_b-handler-execute-weather")
 	defer spanWeather.End()
 
+	spanWeather.SetAttributes(attribute.String("service.action", "get weather"))
 	wc, err := weather.GetWeather(l.GetCity())
 	if err != nil {
 		log.Println("error to execute and get weather for city:", city)
-		otel.Logger(ctxSpanWeather, "status: error to get weather")
-		spanWeather.SetAttributes(attribute.String("action", "get weather"), attribute.String("status", "failed"))
+		spanWeather.SetAttributes(attribute.String("service.status", "failed"))
 		return fmt.Errorf("500")
 	}
 	err = l.SetTemperatures(wc)
 	if err != nil {
 		log.Println("error to set temperatures")
-		otel.Logger(ctxSpanWeather, "status: error to set temperatures")
-		spanWeather.SetAttributes(attribute.String("action", "set temperature"), attribute.String("status", "failed"))
+		spanWeather.SetAttributes(attribute.String("service.status", "failed"))
 		return fmt.Errorf("500")
 	}
-	spanWeather.SetAttributes(attribute.String("action", "get weather"), attribute.String("status", "success"))
 
 	log.Println("execute finish with success:", l)
-	spanFull.SetAttributes(attribute.String("status", "success"))
+	spanWeather.SetAttributes(attribute.String("service.status", "success"))
 	return nil
 }
 
